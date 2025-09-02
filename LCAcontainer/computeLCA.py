@@ -1,6 +1,7 @@
 import os
 import sys
 import argparse
+import datetime
 from statistics import mean
 '''
 INPUT: tab-delimited blastn output. Assuming that taxonomy ID is in this format:
@@ -42,9 +43,16 @@ def main():
                         qlen slen mismatch gapopen gaps qstart qend sstart send stitle evalue bitscore qcovs qcovhsp"''')
     parser.add_argument('--data-dir', metavar='DIR', type=str, default=DATA_DIR,
                         help=f'Where taxonkit data is stored. Defaults to "{DATA_DIR}".')
+    parser.add_argument('--output', '-o', type=str, required=True,
+                        help='Path to the output TSV file (required)')
+    parser.add_argument('--gene-type', type=str, required=True, 
+                        help='Gene type to include as a column')
+    parser.add_argument('--date', type=str, default=None, 
+                        help='Optional date to include (defaults to today in yymmdd format)')
     args = parser.parse_args()
 
     data_dir = args.data_dir
+    date_str = args.date if args.date else datetime.datetime.now().strftime("%y%m%d")
 
     current_query = None
     taxons = None
@@ -105,26 +113,28 @@ def main():
 
     reformatted_taxa = open('TAXONKIT_RESULTS.txt').readlines()
 
-    for q, t, l, p, x  in zip(list_of_queries, all_taxa, reformatted_taxa, list_of_percentages, list_of_lengths):
-        # 119195  cellular organisms;Eukaryota;Opisthokonta;Metazoa;Eumetazoa;Bilateria;Deuterostomia;Chordata;Craniata;Vertebrata;Gnathostomata;Chondrichthyes;Elasmobranchii;Selachii;Galeomorphii;Galeoidea                                        Galeoidea        Eukaryota;Chordata;Chondrichthyes;;;;
-        newnames = t.split('\t')
-        # ['55137', 'cellular organisms;Eukaryota;Opisthokonta;Metazoa;Eumetazoa;Bilateria;Deuterostomia;Chordata;Craniata;Vertebrata;Gnathostomata;Chondrichthyes;Elasmobranchii;Batoidea;Myliobatiformes;Myliobatidae;Myliobatinae;Myliobatis', 'Myliobatis']
+    with open(args.output, 'w') as outf:
+        for q, t, l, p, x  in zip(list_of_queries, all_taxa, reformatted_taxa, list_of_percentages, list_of_lengths):
+            # 119195  cellular organisms;Eukaryota;Opisthokonta;Metazoa;Eumetazoa;Bilateria;Deuterostomia;Chordata;Craniata;Vertebrata;Gnathostomata;Chondrichthyes;Elasmobranchii;Selachii;Galeomorphii;Galeoidea                                        Galeoidea        Eukaryota;Chordata;Chondrichthyes;;;;
+            newnames = t.split('\t')
+            # ['55137', 'cellular organisms;Eukaryota;Opisthokonta;Metazoa;Eumetazoa;Bilateria;Deuterostomia;Chordata;Craniata;Vertebrata;Gnathostomata;Chondrichthyes;Elasmobranchii;Batoidea;Myliobatiformes;Myliobatidae;Myliobatinae;Myliobatis', 'Myliobatis']
 
-        lineage = newnames[1]
-        #if 'Chondrichthyes' in lineage:
-        #    lineage = ';'.join(lineage[:16])
-        #else:
-        #    lineage = ';'.join(lineage[:17])
-        #186625  cellular organisms;Eukaryota;Opisthokonta;Metazoa;Eumetazoa;Bilateria;Deuterostomia;Chordata;Craniata;Vertebrata;Gnathostomata;Teleostomi;Euteleostomi;Actinopterygii;Actinopteri;Neopterygii;Teleostei;Osteoglossocephalai;Clupeocephala       Clupeocephala   ;;
-        family_genus_s = l.rstrip().split('\t')[-1]
-        newlineage = lineage+';'+family_genus_s
-        last_one = ''
-        for i in newlineage.split(';'):
-            if i:
-                last_one = i
+            lineage = newnames[1]
+            #if 'Chondrichthyes' in lineage:
+            #    lineage = ';'.join(lineage[:16])
+            #else:
+            #    lineage = ';'.join(lineage[:17])
+            #186625  cellular organisms;Eukaryota;Opisthokonta;Metazoa;Eumetazoa;Bilateria;Deuterostomia;Chordata;Craniata;Vertebrata;Gnathostomata;Teleostomi;Euteleostomi;Actinopterygii;Actinopteri;Neopterygii;Teleostei;Osteoglossocephalai;Clupeocephala       Clupeocephala   ;;
+            family_genus_s = l.rstrip().split('\t')[-1]
+            newlineage = lineage+';'+family_genus_s
+            last_one = ''
+            for i in newlineage.split(';'):
+                if i:
+                    last_one = i
 
-        print(q + '\t' + lineage+';'+family_genus_s + '\t' + last_one + '\t%.2f\t%.0f'%(p, x) )
-        #print(f'{q}\t{newlist}\t{lastone}')
+            outf.write(f"{q}\t{lineage};{family_genus_s}\t{last_one}\t{p:.2f}\t{x:.0f}\t{date_str}\t{args.gene_type}\n")
+
+            #print(f'{q}\t{newlist}\t{lastone}')
 
     #os.remove("TEMP_TAXONS.txt")
 
